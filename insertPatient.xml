@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<api context="/insertPatient" name="insertPatient" xmlns="http://ws.apache.org/ns/synapse">
+    <resource methods="POST">
+        <inSequence>
+            <!-- Estrai i dati dalla richiesta -->
+            <!-- Altrimenti termina il flusso -->
+            <!-- Chiamata al gate -->
+            <property expression="json-eval($)" name="p_jsonAnagrafe" scope="default" type="STRING"/>
+            <!-- Controllo del flag nel file di proprietà -->
+            <property expression="substring-after(get-property('registry','gov:/custom/flag.properties','flag'), '=')" name="flag" scope="default" type="STRING"/>
+            <log level="custom">
+                <property expression="$ctx:flag" name="FlagValue"/>
+            </log>
+            <filter xpath="$ctx:flag='TRUE'">
+                <then>
+                    <payloadFactory media-type="json">
+                        <format>
+					$1
+				</format>
+                        <args>
+                            <arg evaluator="xml" expression="$ctx:p_jsonAnagrafe"/>
+                        </args>
+                    </payloadFactory>
+                    <sequence key="dynamicEndpoint"/>
+                    <call>
+                        <endpoint>
+                            <http method="post" uri-template="$FILE:insertPatient">
+                                <suspendOnFailure>
+                                    <initialDuration>-1</initialDuration>
+                                    <progressionFactor>1</progressionFactor>
+                                </suspendOnFailure>
+                                <markForSuspension>
+                                    <retriesBeforeSuspension>0</retriesBeforeSuspension>
+                                </markForSuspension>
+                            </http>
+                        </endpoint>
+                    </call>
+                </then>
+                <else>
+                    <log level="custom">
+                        <property name="message" value="Flag non settato su TRUE. Terminazione del flusso."/>
+                    </log>
+                    <!-- Restituisci un messaggio di errore esplicito -->
+                    <payloadFactory media-type="json">
+                        <format>{"error": "Flag non settato su TRUE. Terminazione del flusso."}</format>
+                        <args/>
+                    </payloadFactory>
+                    <respond/>
+                </else>
+            </filter>
+            <property expression="json-eval($)" name="gateResponse" scope="default" type="STRING"/>
+            <!-- Chiamata al converter -->
+            <payloadFactory media-type="json">
+                <format>
+					$1
+				</format>
+                <args>
+                    <arg evaluator="xml" expression="$ctx:p_jsonAnagrafe"/>
+                </args>
+            </payloadFactory>
+            <call>
+                <endpoint>
+                    <http method="post" uri-template="$FILE:convertP">
+                        <suspendOnFailure>
+                            <initialDuration>-1</initialDuration>
+                            <progressionFactor>1</progressionFactor>
+                        </suspendOnFailure>
+                        <markForSuspension>
+                            <retriesBeforeSuspension>0</retriesBeforeSuspension>
+                        </markForSuspension>
+                    </http>
+                </endpoint>
+            </call>
+            <property expression="json-eval($)" name="converterResponse" scope="default" type="STRING"/>
+            <!-- Log delle risposte -->
+            <log level="custom">
+                <property expression="$ctx:gateResponse" name="gateResponse"/>
+                <property expression="$ctx:converterResponse" name="converterResponse"/>
+            </log>
+            <!-- Creazione della risposta finale -->
+            <!-- Creazione della risposta finale -->
+            <payloadFactory media-type="json">
+                <format>{"response_insert": $1}</format>
+                <args>
+                    <arg evaluator="xml" expression="$ctx:gateResponse"/>
+                </args>
+            </payloadFactory>
+            <respond/>
+            <!-- Log delle risposte -->
+            <log level="custom">
+                <property expression="$ctx:gateResponse" name="gateResponse"/>
+                <property expression="$ctx:converterResponse" name="converterResponse"/>
+                <property expression="$ctx:anagraficaResponse" name="anagraficaResponse"/>
+            </log>
+            <log level="full"/>
+            <!-- Calling AAC -->
+            <payloadFactory media-type="json">
+                <format>
+					$1
+				</format>
+                <args>
+                    <arg evaluator="xml" expression="$ctx:converterResponse"/>
+                </args>
+            </payloadFactory>
+            <call>
+                <endpoint>
+                    <http method="post" uri-template="$FILE:anagraficaRecive">
+                        <suspendOnFailure>
+                            <initialDuration>-1</initialDuration>
+                            <progressionFactor>1</progressionFactor>
+                        </suspendOnFailure>
+                        <markForSuspension>
+                            <retriesBeforeSuspension>0</retriesBeforeSuspension>
+                        </markForSuspension>
+                    </http>
+                </endpoint>
+            </call>
+            <property expression="json-eval($)" name="anagraficaResponse" scope="default" type="STRING"/>
+            <respond/>
+        </inSequence>
+        <outSequence/>
+        <faultSequence/>
+    </resource>
+</api>
